@@ -6,7 +6,7 @@ import pandas as pd
 month = '2023-11'
 
 # 读取Excel文件
-df = pd.read_excel(fr'\\10.12.21.65\share\外包费用\新流程\{month}\Step1-考勤数据\外包钉钉考勤.xlsx')
+df = pd.read_excel(fr'\\10.12.21.65\share\外包费用\新流程\{month}\Step1-考勤数据\外包钉钉考勤.xlsm')
 
 # 拆分数据
 for value in df['公司'].unique():
