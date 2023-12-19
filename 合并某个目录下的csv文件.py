@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 # 设置要合并的 CSV 文件所在的目录
-directory = r'Z:\2023刷脸数据'
+directory = rf'\\10.12.21.65\share\2023刷脸数据'
 
 # 特定字符串开头
 prefix = 'export'
