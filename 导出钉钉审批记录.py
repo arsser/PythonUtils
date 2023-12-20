@@ -1,6 +1,7 @@
 import requests
 import csv
 import time
+import pandas as pd
 
 # 常量
 APP_KEY = 'dingl5qlh2s1ddksf5ru'
@@ -89,6 +90,30 @@ def export_to_csv(records, filename='approval_records.csv'):
             ])
             #writer.writerow([record['process_instance_id'], record['title'], record['status'], record['create_time'], record['finish_time']])
 
+def parse_form_values(records):
+    all_fields = set()
+    parsed_records = []
+
+    # 解析每个记录的表单值
+    for record in records:
+        form_values = record['form_component_values']
+        parsed_record = {val['name']: val['value'] for val in form_values}
+        parsed_records.append(parsed_record)
+        all_fields.update(parsed_record.keys())
+
+    return all_fields, parsed_records
+
+def export_to_excel(records, all_fields, filename='approval_records.xlsx'):
+    # 准备数据，确保每条记录都有所有字段
+    prepared_data = []
+    for record in records:
+        prepared_data.append({field: record.get(field, '') for field in all_fields})
+    
+    # 创建 DataFrame 并导出到 Excel
+    df = pd.DataFrame(prepared_data)
+    df.to_excel(filename, index=False)
+
+
 # 主逻辑
 if __name__ == '__main__':
     token = get_access_token()
@@ -98,5 +123,8 @@ if __name__ == '__main__':
     record_ids = get_approval_record_ids(token, KQ_PROCESS_CODE, start_time, end_time)
     detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids]
 
-    export_to_csv(detailed_records)
-
+    #export_to_csv(detailed_records)
+    
+    all_fields, parsed_records = parse_form_values(detailed_records)
+    
+    export_to_excel(parsed_records, all_fields)
