@@ -23,8 +23,6 @@ APPROVAL_RECORD_URL = f'{DINGTALK_API_BASE}/topapi/processinstance/listids'
 KQ_PROCESS_CODE = 'PROC-6B32AF04-FE29-4DAC-9B99-2D4D58183DC9' #外包考勤的OA审批,v1旧版版编辑模板时显示在url
 BX_PROCESS_CODE = 'PROC-B193D2E7-4B1B-43EA-8581-CEF423B71C1F' #外包报销的OA审批
 
-CORP_INFO_FILE= fr'\\10.12.21.65\Share\外包费用\新流程\2023-11\Step1-考勤数据\【HR】外包人员表.xlsx'
-
 # 获取 AccessToken
 def get_access_token():
     response = requests.get(GET_TOKEN_URL)
@@ -72,7 +70,7 @@ def get_all_approval_record_ids(token, process_code, start_time, end_time):
                 break  # 没有更多数据或next_cursor为0            
         else:
             raise Exception('Failed to get approval record IDs')
-        break    
+           
     return all_record_ids
 
 # 获取单个审批记录的详细数据
@@ -117,7 +115,7 @@ def prepare_data_for_excel(records):
 
 def get_approval_data(token, process_code, start_time, end_time):
     record_ids = get_all_approval_record_ids(token, process_code, start_time, end_time)
-    detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids[:3]]
+    detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids]
     return detailed_records
 
 def number_to_chinese(num):
@@ -159,7 +157,7 @@ def merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, hr_excel_sheet, merged_excel):
     df_approval_records = pd.read_excel(kaoqin_excel)
 
     # 读取公司信息表的上个月数据
-    df_company_info = pd.read_excel(CORP_INFO_FILE, sheet_name=hr_excel_sheet,usecols=['姓名','供应商','入职日期','离职日期'])
+    df_company_info = pd.read_excel(hr_excel, sheet_name=hr_excel_sheet,usecols=['姓名','供应商','入职日期','离职日期'])
      
     # 使用 '姓名'（或其他合适的键）进行合并
     # 假设两个表都有一个共同的列 '姓名' 用于合并
@@ -169,8 +167,10 @@ def merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, hr_excel_sheet, merged_excel):
     # 删除重复的列（例如，删除 "姓名" 列）
     #df_merged.drop(columns=['姓名'], inplace=True)
     # 指定新的列顺序
-    new_column_order = ['供应商', '审批ID', '创建人','出勤月份', '入职日期','离职日期','姓名','本月缺勤天数','具体缺勤日期','本月加班天数','具体加班日期',
-                        '加班原因','备注','审批状态','审批结果','标题','发起时间','结束时间','创建人部门','部门信息']
+    new_column_order = ['供应商', '审批ID', '创建人','出勤月份', '入职日期','离职日期','姓名',
+                        '本月缺勤天数','具体缺勤日期','本月加班天数','具体加班日期',
+                        '加班原因','备注','审批状态','审批结果','标题','发起时间','结束时间',
+                        '创建人部门','部门信息']
 
     # 重新排列列
     df_merged = df_merged[new_column_order]
@@ -185,11 +185,16 @@ def merge_baoxiao_hr_excel(hr_excel, sheet_name, merge_excel):
 #按供应商把考勤excel文件做拆分
 def split_kaoqin_excel(excel, month):
     df = pd.read_excel(excel)
+    # 如果存在日期列，转换为仅日期格式
+    if '入职日期' in df.columns:
+        df['入职日期'] = pd.to_datetime(df['入职日期']).dt.date
+    if '离职日期' in df.columns:
+        df['离职日期'] = pd.to_datetime(df['离职日期']).dt.date
     for value in df['供应商'].unique():
         df_subset = df[df['供应商'] == value]
         base_dir = os.path.dirname(excel)
         df_subset.to_excel(rf"{base_dir}\chai_{value}_{month}月出勤.xlsx", index=False)
-    return 0
+
 
 def split_baoxiao_excel():
     return 0
@@ -269,7 +274,7 @@ if __name__ == '__main__':
     end_time = datetime(now.year, now.month, 10)
 
     #1. 获取考勤,报销的审批记录，并保存为excel文件；
-    #get_kaoqin_ding_data(token, KQ_PROCESS_CODE, start_time, end_time, start_time.month, kaoqin_excel)
+    get_kaoqin_ding_data(token, KQ_PROCESS_CODE, start_time, end_time, start_time.month, kaoqin_excel)
     #get_baoxiao_ding_data(token,BX_PROCESS_CODE, start_time, end_time, baoxiao_excel)
     
     #2. merge
@@ -278,11 +283,11 @@ if __name__ == '__main__':
     first_day_of_current_month = datetime(now.year, now.month, 1)
     last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
     previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
-    #merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
+    merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
     
     #3. 分拆
-    kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2023-12-20-224439.xlsx'
-    #split_kaoqin_excel(kaoqin_merged_excel, previous_month_str)
+    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2023-12-20-224439.xlsx'
+    split_kaoqin_excel(kaoqin_merged_excel, previous_month_str)
     #sys.exit(0)
 
     #4. 生成邮件草稿
@@ -292,67 +297,3 @@ if __name__ == '__main__':
     mailto_supplier(outlook_account, suppliers, base_dir+'\考勤报销数据',previous_month_str)
     
     sys.exit(0)
-
-
-    sys.exit(0)
-
-    #4. 分拆报销的审批excel文件；
-    split_baoxiao_excel()
-    #5. make email draft；
-    
-
-    #1. 生成文件名
-
-    #2. 获取审批记录 ID 和详细信息
-
-    #3. 准备数据并导出到 Excel
-
-    #4. 读取审批记录和公司信息表，进行数据过滤和合并
-
-    #5. 调整 DataFrame 的列顺序并导出
-
-    record_ids = get_all_approval_record_ids(token, KQ_PROCESS_CODE, start_time, end_time)
-    detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids]
-
-    prepared_records = prepare_data_for_excel(detailed_records)
-    
-
-    export_to_excel(prepared_records,filename)
-
-    # 获取上一个月的月份
-    now = datetime.now()
-    first_day_of_current_month = datetime(now.year, now.month, 1)
-    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
-    previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
-    # 读取审批记录表
-    df_approval_records = pd.read_excel(filename)
-
-    # 读取公司信息表的上个月数据
-    df_company_info = pd.read_excel(CORP_INFO_FILE, sheet_name=previous_month_str,usecols=['姓名','供应商','入职日期','离职日期'])
-    # 过滤出 '出勤月份' 为 '11月' 的数据
-    df_filtered = df_approval_records[df_approval_records['出勤月份'] == '十一月']    
-
-    # 使用 '姓名'（或其他合适的键）进行合并
-    # 假设两个表都有一个共同的列 '姓名' 用于合并
-    df_merged = pd.merge(df_filtered, df_company_info, left_on='创建人', right_on='姓名', how='outer')
-    df_merged['入职日期'] = pd.to_datetime(df_merged['入职日期']).dt.date
-    df_merged['离职日期'] = pd.to_datetime(df_merged['离职日期']).dt.date
-    # 删除重复的列（例如，删除 "姓名" 列）
-    #df_merged.drop(columns=['姓名'], inplace=True)
-    # 指定新的列顺序
-    new_column_order = ['供应商', '审批ID', '创建人','出勤月份', '入职日期','离职日期','姓名','本月缺勤天数','具体缺勤日期','本月加班天数','具体加班日期',
-                        '加班原因','备注','审批状态','审批结果','标题','发起时间','结束时间','创建人部门','部门信息']
-
-    # 重新排列列
-    df_merged = df_merged[new_column_order]
-    # 将合并后的数据导出到新的 Excel 文件
-    df_merged.to_excel(f"{filename}.1.xlsx", index=False)
-   
-    df = df_merged
-    month = '11'
-    # 拆分数据
-    for value in df['供应商'].unique():
-        df_subset = df[df['供应商'] == value]
-        df_subset.to_excel(rf"\\10.12.21.65\share\外包费用\新流程\chai_{value}_{month}月出勤.xlsx", index=False)
-
-
