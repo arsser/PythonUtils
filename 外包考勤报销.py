@@ -1,8 +1,17 @@
+#外包考勤报销，主要功能：
+#1.从钉钉获取外包考勤、报销的审批记录；
+#2.对审批记录做处理，包括：筛选上个月的数据，和hr的名单做merge，按供应商拆分
+#3.按照供应商名单，将拆分后的文件生产邮件草稿
+
 import requests
 import csv
 import time
 import pandas as pd
 from datetime import datetime,timedelta
+import sys
+import os
+import win32com.client as win32
+from openpyxl import load_workbook
 
 # 常量
 APP_KEY = 'dingl5qlh2s1ddksf5ru'
@@ -63,9 +72,7 @@ def get_all_approval_record_ids(token, process_code, start_time, end_time):
                 break  # 没有更多数据或next_cursor为0            
         else:
             raise Exception('Failed to get approval record IDs')
-        break
-    
-    print(f'获取{process_code} 审批记录条数：{len(all_record_ids)}')
+        break    
     return all_record_ids
 
 # 获取单个审批记录的详细数据
@@ -79,9 +86,8 @@ def get_approval_record_details(token, record_id):
     else:
         raise Exception('Failed to get approval record details')
 
-
-def extract_creator_from_title(title):
-    # 分割标题并提取创建人的名字
+# 分割标题并提取创建人的名字
+def extract_creator_from_title(title):   
     parts = title.split('提交的')
     creator = parts[0] if len(parts) > 1 else None
     return creator
@@ -109,17 +115,6 @@ def prepare_data_for_excel(records):
             prepared_data.append(combined_record)
     return prepared_data
 
-
-def generate_filename():
- # 获取当前日期和时间，并格式化为字符串，格式为"年-月-日 时-分-秒"
-    current_datetime_str = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-
-    # 设置文件名为当前日期时间
-    filename = f'外包出勤审批_{current_datetime_str}.xlsx'
-      
-    filename='外包出勤审批_2023-12-20-114202.xlsx'
-    return filename
-
 def get_approval_data(token, process_code, start_time, end_time):
     record_ids = get_all_approval_record_ids(token, process_code, start_time, end_time)
     detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids[:3]]
@@ -142,32 +137,24 @@ def number_to_chinese(num):
     }
     return num_to_chinese.get(num, '')
 
-
+#获取考勤的钉钉审批记录，kaoqin_month表示要获取哪个月份的考勤记录;
 def get_kaoqin_ding_data(token, process_code,  start_time, end_time, kaoqin_month, excel_file):
-    #获取考勤的钉钉审批记录，kaoqin_month表示要获取哪个月份的考勤记录;
     record_ids = get_all_approval_record_ids(token, process_code, start_time, end_time)
+    print(f'获取考勤审批记录条数：{len(record_ids)}')
     detailed_records = [get_approval_record_details(token, record_id) for record_id in record_ids]
     prepared_records =  pd.DataFrame(prepare_data_for_excel(detailed_records))
     # 过滤出 '出勤月份' 为 kaoqin_month 的数据
     kaoqin_mon_chin = f'{number_to_chinese(kaoqin_month)}月'
     df_filtered = prepared_records[prepared_records['出勤月份'] == kaoqin_mon_chin]  
     df_filtered.to_excel(excel_file, index=False)
+    print(f'保存{kaoqin_month}月考勤记录到{excel_file}')
     return 0
 
 def get_baoxiao_ding_data(token, process_code,  start_time, end_time, baoxiao_month, excel_file):
     return 0
 
-
+#把考勤的excel和hr的人员信息excel进行合并,该excel按月份建立sheet，记录当月的外包人员信息；
 def merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, hr_excel_sheet, merged_excel):
-    #把考勤的excel和hr的人员信息excel进行合并,该excel按月份建立sheet，记录当月的外包人员信息；
-    # 获取上一个月的月份
-    now = datetime.now()
-    first_day_of_current_month = datetime(now.year, now.month, 1)
-    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
-    previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
-
-    hr_excel_sheet = previous_month_str
-
     # 读取审批记录表
     df_approval_records = pd.read_excel(kaoqin_excel)
 
@@ -176,7 +163,7 @@ def merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, hr_excel_sheet, merged_excel):
      
     # 使用 '姓名'（或其他合适的键）进行合并
     # 假设两个表都有一个共同的列 '姓名' 用于合并
-    df_merged = pd.merge(df_filtered, df_company_info, left_on='创建人', right_on='姓名', how='outer')
+    df_merged = pd.merge(df_approval_records, df_company_info, left_on='创建人', right_on='姓名', how='outer')
     df_merged['入职日期'] = pd.to_datetime(df_merged['入职日期']).dt.date
     df_merged['离职日期'] = pd.to_datetime(df_merged['离职日期']).dt.date
     # 删除重复的列（例如，删除 "姓名" 列）
@@ -188,30 +175,84 @@ def merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, hr_excel_sheet, merged_excel):
     # 重新排列列
     df_merged = df_merged[new_column_order]
     # 将合并后的数据导出到新的 Excel 文件
-    df_merged.to_excel(merge_excel, index=False)
+    df_merged.to_excel(merged_excel, index=False)
+    print(f'merge考勤记录到{merged_excel}')
 
 def merge_baoxiao_hr_excel(hr_excel, sheet_name, merge_excel):
     #把报销的excel和hr的人员信息excel进行合并
     return 0
 
-def split_kaoqin_excel(excel):
+#按供应商把考勤excel文件做拆分
+def split_kaoqin_excel(excel, month):
+    df = pd.read_excel(excel)
+    for value in df['供应商'].unique():
+        df_subset = df[df['供应商'] == value]
+        base_dir = os.path.dirname(excel)
+        df_subset.to_excel(rf"{base_dir}\chai_{value}_{month}月出勤.xlsx", index=False)
     return 0
 
 def split_baoxiao_excel():
     return 0
 
-def mailto_supplier():
-    return 0
+def mailto_supplier(account_email, supplier_info, directory, subject_suffix_year_month):
+    outlook = win32.Dispatch('outlook.application')
+    namespace = outlook.GetNamespace("MAPI")
+    account = namespace.Folders[account_email]
+
+    # 获取当前日期和前一个月的日期
+    current_date = datetime.now()
+    previous_month_date = current_date.replace(day=1) - timedelta(days=1)
+
+    # 格式化日期为 "2023年11月" 和 "2023年x月x日"
+    subject_suffix = subject_suffix_year_month #previous_month_date.strftime(" - %Y年%m月")
+    closing_remark = f"依图供应链\n{current_date.strftime('%Y年%m月%d日')}"
+
+    for supplier in supplier_info:
+        # 查找并附加文件（使用模糊匹配）
+        files = find_files(supplier['供应商'], directory)
+
+        # 如果没有找到文件，则跳过当前供应商
+        if not files:
+            print(f"未找到与供应商 {supplier['供应商']} 匹配的文件，跳过发送邮件。")
+            continue
+
+        mail = account.Items.Add("IPM.Note")
+        mail.To = supplier['邮箱']
+        mail.Subject = f"请确认软件技术服务人员出勤-报销{subject_suffix}"
+        mail.Body = f"尊敬的供应商，{supplier['供应商']}，\n\n相关内容，请查收附件。\n\n{closing_remark}"
+
+        for file in files:
+            mail.Attachments.Add(file)
+
+        mail.Save()
+
+def find_files(supplier_name_fragment, directory):
+    """根据供应商名称的一部分查找文件"""
+    files = []
+    for file in os.listdir(directory):
+        if supplier_name_fragment.lower() in file.lower() and file.endswith(".xlsx"):
+            files.append(os.path.join(directory, file))
+    return files
+
+def read_excel(file_path):
+    """从 Excel 读取供应商信息"""
+    workbook = load_workbook(filename=file_path)
+    sheet = workbook.active
+    suppliers = []
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        suppliers.append({'供应商': row[0], '联系人': row[1], '邮箱': row[2]})
+    return suppliers
 
 # 主逻辑
 if __name__ == '__main__':     
     # 获取当前日期和时间，并格式化为字符串，格式为"年-月-日-时分秒"
     current_datetime_str = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    kaoqin_excel =       fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_{current_datetime_str}.xlsx'
-    kaoqin_merged_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_merge_{current_datetime_str}.xlsx'
-    hr_excel =           fr'\\10.12.21.65\share\外包费用\新流程\【HR】外包人员表.xlsx'
+    base_dir = fr'\\10.12.21.65\share\外包费用\新流程'
+    kaoqin_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_{current_datetime_str}.xlsx'
+    kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_{current_datetime_str}.xlsx'
+    hr_excel =           fr'{base_dir}\【HR】外包人员表.xlsx'
     #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2023-12-20-114202.xlsx'
-    baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_{current_datetime_str}.xlsx'
+    baoxiao_excel = fr'{base_dir}\考勤报销数据\外包报销审批_{current_datetime_str}.xlsx'
 
     token = get_access_token()
 
@@ -227,25 +268,38 @@ if __name__ == '__main__':
     
     end_time = datetime(now.year, now.month, 10)
 
-
     #1. 获取考勤,报销的审批记录，并保存为excel文件；
-    get_kaoqin_ding_data(token, KQ_PROCESS_CODE, start_time, end_time, start_time.month, kaoqin_excel)
+    #get_kaoqin_ding_data(token, KQ_PROCESS_CODE, start_time, end_time, start_time.month, kaoqin_excel)
     #get_baoxiao_ding_data(token,BX_PROCESS_CODE, start_time, end_time, baoxiao_excel)
     
     #2. merge
-    merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, '11', kaoqin_merged_excel)
-
-
+    # 获取上一个月的月份
+    now = datetime.now()
+    first_day_of_current_month = datetime(now.year, now.month, 1)
+    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+    previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
+    #merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
+    
     #3. 分拆
-    split_kaoqin_excel(kaoqin_merged_excel)
-
+    kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2023-12-20-224439.xlsx'
+    #split_kaoqin_excel(kaoqin_merged_excel, previous_month_str)
+    #sys.exit(0)
 
     #4. 生成邮件草稿
+    outlook_account = 'scm_bill@yitu-inc.com' # 替换为你的 Outlook 账户名
+    directory = base_dir 
+    suppliers = read_excel(base_dir +"\人力外包供应商信息.xlsx")
+    mailto_supplier(outlook_account, suppliers, base_dir+'\考勤报销数据',previous_month_str)
+    
+    sys.exit(0)
+
+
+    sys.exit(0)
 
     #4. 分拆报销的审批excel文件；
     split_baoxiao_excel()
     #5. make email draft；
-    mailto_supplier()
+    
 
     #1. 生成文件名
 
