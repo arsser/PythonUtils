@@ -64,7 +64,7 @@ def download_attachments(category, subject_keyword, save_folder):
         #print(query_string)
         messages = messages.Restrict(query_string)        
         for message in messages:
-            print("正在处理邮件：{}".format(message.Subject))
+            #print("正在处理邮件：{}".format(message.Subject))
             if not subject_keyword or subject_keyword in message.Subject:
                 attachments = message.Attachments
                 for attachment in attachments:
@@ -72,6 +72,9 @@ def download_attachments(category, subject_keyword, save_folder):
                         file_path = os.path.join(save_folder, attachment.FileName)
                         if not os.path.exists(file_path):  # 检查文件是否存在
                             attachment.SaveAsFile(file_path)
+                            print(f"保存附件：{file_path}")
+                        else:
+                            print(f"文件已存在，跳过保存：{file_path}")
                 # 清除邮件的类别标记
                 #message.Categories = ''
                 #message.Save()
@@ -97,7 +100,8 @@ def merge_excel_files(sheet_name1 , directory, file_extension=".xlsx", ):
             # 如果找到有效行，截取到这一行
             if last_valid_index is not None:
                 df = df.loc[:last_valid_index]
-            all_data = pd.concat([all_data, df], ignore_index=True)            
+            all_data = pd.concat([all_data, df], ignore_index=True)    
+    print(all_data)        
     return all_data
 
 def copy_data_to_template(data, template_path, start_row, cols_to_copy, sheet_name):
@@ -154,10 +158,10 @@ if __name__ == "__main__":
     # 合并 Excel 文件
     last_month = datetime.now() - timedelta(days=30)
     sheet_name = last_month.strftime("结算单%Y-%m")
-    #merged_data = merge_excel_files(sheet_name, save_folder)
+    merged_data = merge_excel_files(sheet_name, save_folder)
 
     # 保存合并后的文件
-    #merged_data.to_excel(os.path.join(save_folder, merged_file), index=False)
+    merged_data.to_excel(os.path.join(save_folder, merged_file), index=False)
 
     #exit(0)
 

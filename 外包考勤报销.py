@@ -13,7 +13,7 @@ import os
 import win32com.client as win32
 from openpyxl import load_workbook
 import json
-
+import glob
 
 # 常量
 APP_KEY = 'dingl5qlh2s1ddksf5ru'
@@ -524,28 +524,36 @@ if __name__ == '__main__':
     else:
         bx_data_start_time = datetime(now.year, now.month - 1, 1)
 
-    #1. 获取考勤,报销的审批记录，并保存为excel文件；    
-    get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
-    get_baoxiao_ding_data(token, BX_PROCESS_CODE, bx_data_start_time, bx_data_end_time, bx_data_start_time.month, baoxiao_excel)
-    #sys.exit(0)
-
-    #2. merge
-    # 获取上一个月的月份
+    #0. 如果文件已存在，就跳过1-3步，直接生成邮件草稿；
+    # 指定要搜索的路径
+    path = fr'{base_dir}\考勤报销数据'
+    pattern = '*.xlsx'
+    # 使用glob.glob()搜索匹配的文件
+     # 获取上一个月的月份
     now = datetime.now()
     first_day_of_current_month = datetime(now.year, now.month, 1)
     last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
     previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
-    merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
-    merge_baoxiao_hr_excel(baoxiao_excel, hr_excel, previous_month_str, baoxiao_merged_excel)
-    #sys.exit(0)
-    
-    #3. 分拆    
-    split_excel(kaoqin_merged_excel, previous_month_str, "出勤")
-    split_excel(baoxiao_merged_excel, previous_month_str, "报销")
-    #sys.exit(0)
+    matching_files = glob.glob(os.path.join(path, pattern))
+    if not matching_files:
+        #1. 获取考勤,报销的审批记录，并保存为excel文件；    
+        get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
+        get_baoxiao_ding_data(token, BX_PROCESS_CODE, bx_data_start_time, bx_data_end_time, bx_data_start_time.month, baoxiao_excel)
+        #sys.exit(0)
+
+        #2. merge       
+        merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
+        merge_baoxiao_hr_excel(baoxiao_excel, hr_excel, previous_month_str, baoxiao_merged_excel)
+        #sys.exit(0)
+        
+        #3. 分拆    
+        split_excel(kaoqin_merged_excel, previous_month_str, "出勤")
+        split_excel(baoxiao_merged_excel, previous_month_str, "报销")
+        #sys.exit(0)
 
     #4. 生成邮件草稿
     outlook_account = 'scm_bill@yitu-inc.com' # 替换为你的 Outlook 账户名
     directory = base_dir 
     suppliers = read_excel(base_dir +"\人力外包供应商信息.xlsx")
     mailto_supplier(outlook_account, suppliers, base_dir+'\考勤报销数据',previous_month_str)
+
