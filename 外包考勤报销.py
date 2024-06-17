@@ -196,8 +196,12 @@ def parse_table_field(table_data):
         parsed_row = []
         for cell in row['rowValue']:
             if cell['componentType'] == 'DDAttachment':  # 特殊处理附件字段
-                attachment_info = '; '.join([f"{att['fileName']} ({att['fileSize']} bytes)" for att in cell['value']])
-                parsed_row.append(f"{cell['label']}: {attachment_info}")
+                try:
+                    attachment_info = '; '.join([f"{att['fileName']} ({att['fileSize']} bytes)" for att in cell['value']])
+                    parsed_row.append(f"{cell['label']}: {attachment_info}")
+                except Exception as e:
+                    print(f"发生了一个意料之外的异常: {e}")
+                    #raise  # 再次抛出异常，允许调试器捕捉到这个异常点
             else:
                 parsed_row.append(f"{cell['label']}: {cell['value']}")
         parsed_table.append('\n'.join(parsed_row))
@@ -498,12 +502,13 @@ if __name__ == '__main__':
     baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_{current_datetime_str}.xlsx'
 
     #debug
-    #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2023-12-20-114202.xlsx'
-    #baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_2023-12-21-134132.xlsx'
-    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2023-12-20-224439.xlsx'
-    #baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_2023-12-21-143232.xlsx'
+    #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_2024-03-12-181914.xlsx'
+    #baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2024-03-12-181914.xlsx'
+    #kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_2024-03-12-181914.xlsx'
+    #baoxiao_excel=fr'{base_dir}\考勤报销数据\外包报销审批_2024-03-12-181914.xlsx'
+    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2024-02-07-122825.xlsx'
+    #baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_2024-02-07-122825.xlsx'
     #debug
-
 
     token = get_access_token()
 
@@ -536,20 +541,22 @@ if __name__ == '__main__':
     previous_month_str = last_day_of_previous_month.strftime("%Y-%m")
     matching_files = glob.glob(os.path.join(path, pattern))
     if not matching_files:
-        #1. 获取考勤,报销的审批记录，并保存为excel文件；    
+        #1. 获取考勤,报销的审批记录，并保存为excel文件；
+        print("#1. 获取考勤,报销的审批记录，并保存为excel文件；")
         get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
         get_baoxiao_ding_data(token, BX_PROCESS_CODE, bx_data_start_time, bx_data_end_time, bx_data_start_time.month, baoxiao_excel)
         #sys.exit(0)
-
-        #2. merge       
-        merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
-        merge_baoxiao_hr_excel(baoxiao_excel, hr_excel, previous_month_str, baoxiao_merged_excel)
-        #sys.exit(0)
-        
-        #3. 分拆    
-        split_excel(kaoqin_merged_excel, previous_month_str, "出勤")
-        split_excel(baoxiao_merged_excel, previous_month_str, "报销")
-        #sys.exit(0)
+    else:
+        print("#1.本地目录找到文件，跳过钉钉；")
+    #2. merge       
+    merge_kaoqin_hr_excel(kaoqin_excel, hr_excel, previous_month_str, kaoqin_merged_excel)
+    merge_baoxiao_hr_excel(baoxiao_excel, hr_excel, previous_month_str, baoxiao_merged_excel)
+    #sys.exit(0)
+    
+    #3. 分拆    
+    split_excel(kaoqin_merged_excel, previous_month_str, "出勤")
+    split_excel(baoxiao_merged_excel, previous_month_str, "报销")
+    #sys.exit(0)
 
     #4. 生成邮件草稿
     outlook_account = 'scm_bill@yitu-inc.com' # 替换为你的 Outlook 账户名

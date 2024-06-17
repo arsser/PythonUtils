@@ -9,6 +9,7 @@ import pandas as pd
 import win32com.client
 from openpyxl import load_workbook
 from datetime import datetime, timedelta
+from datetime import date
 
 # 设置 Outlook 连接
 outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
@@ -82,12 +83,21 @@ def download_attachments(category, subject_keyword, save_folder):
         print("Error while downloading attachments: ", e)
 
 
-def merge_excel_files(sheet_name1 , directory, file_extension=".xlsx", ):
+def merge_excel_files(sheet_name1 ,sheet_name2,  directory, file_extension=".xlsx", ):
     all_data = pd.DataFrame()
     for file in os.listdir(directory):
         if file.endswith(file_extension):
             file_path = os.path.join(directory, file)
             print("正在处理文件：{}".format(file))
+
+            # 使用 ExcelFile 加载文件，以便检查工作表名称
+            xls = pd.ExcelFile(file_path)            
+            # 检查 sheet_name1 是否存在
+            if sheet_name1 in xls.sheet_names: 
+                sheet_name1 = sheet_name1
+            else:
+                sheet_name1 = sheet_name2
+
             # 指定读取的列和跳过的行数
             #df = pd.read_excel(file_path, usecols='C:F,O,Q:T', skiprows=2)
             if (sheet_name1):
@@ -103,6 +113,29 @@ def merge_excel_files(sheet_name1 , directory, file_extension=".xlsx", ):
             all_data = pd.concat([all_data, df], ignore_index=True)    
     print(all_data)        
     return all_data
+
+def merge_excel_files2(sheet_name1, sheet_name2, directory, file_extension=".xlsx", columns=None):
+    all_data = pd.DataFrame()
+    for file in os.listdir(directory):
+        if file.endswith(file_extension):
+            file_path = os.path.join(directory, file)
+            print("正在处理文件：{}".format(file))
+
+            xls = pd.ExcelFile(file_path)
+            # 使用sheet_name2如果sheet_name1不存在
+            actual_sheet_name = sheet_name1 if sheet_name1 in xls.sheet_names else sheet_name2
+
+            # 读取数据，应用usecols限制导入的列
+            df = pd.read_excel(file_path, sheet_name=actual_sheet_name, skiprows=2, usecols=columns)
+
+            last_valid_index = df.iloc[:, 2].last_valid_index()
+            if last_valid_index is not None:
+                df = df.loc[:last_valid_index]
+            all_data = pd.concat([all_data, df], ignore_index=True)
+
+    print(all_data)
+    return all_data
+
 
 def copy_data_to_template(data, template_path, start_row, cols_to_copy, sheet_name):
     """
@@ -153,12 +186,14 @@ if __name__ == "__main__":
     subject_keyword = ""
     
     # 下载附件
-    download_attachments(category, subject_keyword, save_folder)
+    #debug download_attachments(category, subject_keyword, save_folder)
 
     # 合并 Excel 文件
-    last_month = datetime.now() - timedelta(days=30)
-    sheet_name = last_month.strftime("结算单%Y-%m")
-    merged_data = merge_excel_files(sheet_name, save_folder)
+    last_month = datetime.now() - timedelta(days=45)
+    #last_month = date(2024, 3, 1)
+    sheet_name1 = last_month.strftime("结算单%Y-%m")
+    sheet_name2 = sheet_name1.replace("-0","-")
+    merged_data = merge_excel_files2(sheet_name1, sheet_name2, save_folder, ".xlsx", "A:AC")
 
     # 保存合并后的文件
     merged_data.to_excel(os.path.join(save_folder, merged_file), index=False)
@@ -167,7 +202,7 @@ if __name__ == "__main__":
 
     data_file = merged_file  # 数据文件路径
     template_path =  template_file
-    output_path = fr'\\10.12.21.65\share\外包费用\新流程\[整合].xlsx'
+    #无用output_path = fr'\\10.12.21.65\share\外包费用\新流程\[整合].xlsx'
     start_row = 4  # 从模板的第4行开始拷贝数据
    
     # 从文件读取数据
@@ -186,7 +221,7 @@ if __name__ == "__main__":
     
     # 调用函数将数据拷贝到模板
     # 计算上个月的年-月格式
-    last_month = datetime.now() - timedelta(days=30)
+    #无用last_month = datetime.now() - timedelta(days=30)
     sheet_name = "结算单"+last_month.strftime("%Y-%m")
     
     copy_data_to_template(data, template_path, start_row, cols_to_copy, sheet_name)
