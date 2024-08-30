@@ -189,7 +189,7 @@ if __name__ == "__main__":
     #debug download_attachments(category, subject_keyword, save_folder)
 
     # 合并 Excel 文件
-    last_month = datetime.now() - timedelta(days=45)
+    last_month = datetime.now() - timedelta(days=60)
     #last_month = date(2024, 3, 1)
     sheet_name1 = last_month.strftime("结算单%Y-%m")
     sheet_name2 = sheet_name1.replace("-0","-")

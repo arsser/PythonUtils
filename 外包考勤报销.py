@@ -502,12 +502,12 @@ if __name__ == '__main__':
     baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_{current_datetime_str}.xlsx'
 
     #debug
-    #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_2024-03-12-181914.xlsx'
-    #baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2024-03-12-181914.xlsx'
-    #kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_2024-03-12-181914.xlsx'
-    #baoxiao_excel=fr'{base_dir}\考勤报销数据\外包报销审批_2024-03-12-181914.xlsx'
-    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2024-02-07-122825.xlsx'
-    #baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_2024-02-07-122825.xlsx'
+    #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_2024-08-05-211733.xlsx'
+    #baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2024-08-05-211733.xlsx'
+    #kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_2024-08-05-211733.xlsx'
+    #baoxiao_excel=fr'{base_dir}\考勤报销数据\外包报销审批_2024-08-05-211733.xlsx'
+    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2024-08-05-211733.xlsx'
+    #baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge__2024-08-05-211733.xlsx'
     #debug
 
     token = get_access_token()
