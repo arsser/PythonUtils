@@ -14,6 +14,7 @@ import win32com.client as win32
 from openpyxl import load_workbook
 import json
 import glob
+import pyodbc
 
 # 常量
 APP_KEY = 'dingl5qlh2s1ddksf5ru'
@@ -251,7 +252,7 @@ def prepare_data_for_excel_forbx(records):
                     value = comp['value']
                     if value == 'null':  # 将字符串'null'替换为空字符串
                         value = ''
-                    form_values[comp['name']] = value                    
+                    form_values[comp['name']] = value
 
         if record['status'] == 'COMPLETED' and record['result'] == 'agree':
             combined_record = {
@@ -502,13 +503,14 @@ if __name__ == '__main__':
     baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_{current_datetime_str}.xlsx'
 
     #debug
-    #kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_2024-08-05-211733.xlsx'
-    #baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_2024-08-05-211733.xlsx'
-    #kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_2024-08-05-211733.xlsx'
-    #baoxiao_excel=fr'{base_dir}\考勤报销数据\外包报销审批_2024-08-05-211733.xlsx'
-    #kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_2024-08-05-211733.xlsx'
-    #baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge__2024-08-05-211733.xlsx'
-    #debug
+    # dateStr='2024-09-09-134429'
+    # kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_{dateStr}.xlsx'
+    # baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_{dateStr}.xlsx'
+    # kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_{dateStr}.xlsx'
+    # baoxiao_excel=fr'{base_dir}\考勤报销数据\外包报销审批_{dateStr}.xlsx'
+    # kaoqin_merged_excel = fr'{base_dir}\考勤报销数据\外包出勤审批_merge_{dateStr}.xlsx'
+    # baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_{dateStr}.xlsx'
+    # #debug
 
     token = get_access_token()
 
@@ -523,11 +525,11 @@ if __name__ == '__main__':
         kq_data_start_time = datetime(now.year, now.month - 1, 1)
     
     #报销的数据拉取时间从上个月的1号到上个月的最后一天;
-    bx_data_end_time = datetime(now.year, now.month, 1)
+    bx_data_end_time = datetime(now.year, now.month, 10)
     if now.month == 1:
-        bx_data_start_time = datetime(now.year - 1, 12, 1)
+        bx_data_start_time = datetime(now.year - 1, 12, 5)
     else:
-        bx_data_start_time = datetime(now.year, now.month - 1, 1)
+        bx_data_start_time = datetime(now.year, now.month - 1, 5)
 
     #0. 如果文件已存在，就跳过1-3步，直接生成邮件草稿；
     # 指定要搜索的路径
@@ -542,8 +544,8 @@ if __name__ == '__main__':
     matching_files = glob.glob(os.path.join(path, pattern))
     if not matching_files:
         #1. 获取考勤,报销的审批记录，并保存为excel文件；
-        print("#1. 获取考勤,报销的审批记录，并保存为excel文件；")
-        get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
+        print("#1. 获取#考勤,报销的审批记录，并保存为excel文件；")
+        #get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
         get_baoxiao_ding_data(token, BX_PROCESS_CODE, bx_data_start_time, bx_data_end_time, bx_data_start_time.month, baoxiao_excel)
         #sys.exit(0)
     else:
