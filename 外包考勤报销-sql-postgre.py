@@ -12,10 +12,10 @@ SQLSERVER_CONN_STR = '''
 
 
 # PostgreSQL连接信息
-PG_DBNAME = "yitu_oa"
-PG_USER = "postgres"
-PG_PASSWORD = "postgres"
-PG_HOST = "localhost"
+PG_DBNAME = "VenderCoordination"
+PG_USER = "postgresWaspDevUser"
+PG_PASSWORD = "postgresWaspDevPass"
+PG_HOST = "10.40.30.60"
 PG_PORT = "5432"
 
 # 添加数据库迁移相关函数
@@ -86,3 +86,6 @@ def migrate_data_to_postgresql(df, table_name):
     finally:
         pg_cursor.close()
         pg_conn.close()
+
+if __name__ == '__main__':    
+    migrate_data_to_postgresql

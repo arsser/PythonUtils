@@ -196,17 +196,50 @@ def parse_table_field(table_data):
     for row in table_data:
         parsed_row = []
         for cell in row['rowValue']:
-            if cell['componentType'] == 'DDAttachment':  # 特殊处理附件字段
+            if cell['componentType'] == 'DDAttachment11111':  # 特殊处理附件字段 ，2024-12-09：钉钉改了接口，不再需要区分DDAttachment
                 try:
                     attachment_info = '; '.join([f"{att['fileName']} ({att['fileSize']} bytes)" for att in cell['value']])
                     parsed_row.append(f"{cell['label']}: {attachment_info}")
                 except Exception as e:
                     print(f"发生了一个意料之外的异常: {e}")
+                    print(f"原始数据: {cell}")
                     #raise  # 再次抛出异常，允许调试器捕捉到这个异常点
             else:
                 parsed_row.append(f"{cell['label']}: {cell['value']}")
         parsed_table.append('\n'.join(parsed_row))
     return '\n'.join(parsed_table)  # 每个表格行之间加上换行符
+
+def parse_table_field2(table_data):
+    try:
+        # 如果是字符串,先转换为JSON对象
+        if isinstance(table_data, str):
+            table_data = json.loads(table_data)
+        
+        # 确保table_data是列表
+        if not isinstance(table_data, list):
+            print(f"警告: table_data不是列表类型: {type(table_data)}")
+            return ''
+            
+        # 处理表格数据
+        result = []
+        for row in table_data:
+            if isinstance(row, dict):
+                # 处理字典类型的行数据
+                row_data = {
+                    k: v for k, v in row.items()
+                    if isinstance(k, str) and v is not None
+                }
+                result.append(row_data)
+            else:
+                print(f"警告: 行数据不是字典类型: {type(row)}")
+                
+        return json.dumps(result, ensure_ascii=False)
+        
+    except Exception as e:
+        print(f"解析表格字段时出错: {e}")
+        print(f"原始数据: {table_data}")
+        return ''
+
 
 #处理附件字段，把附件的文件名提取出来
 # def extract_attachment_filenames_old1(attachment_data):
@@ -246,8 +279,23 @@ def prepare_data_for_excel_forbx(records):
             else:
                 if comp['component_type'] == 'TableField':
                     # 解析表格
-                    table_data = json.loads(comp['value'])
-                    form_values[comp['name']] = parse_table_field(table_data)
+                    # table_data = json.loads(comp['value'])
+                    # form_values[comp['name']] = parse_table_field(table_data)
+                    try:
+                        # 确保 comp['value'] 是字符串
+                        if isinstance(comp['value'], str):
+                            table_data = json.loads(comp['value'])
+                        else:
+                            table_data = comp['value']
+                        form_values[comp['name']] = parse_table_field(table_data)
+                    except json.JSONDecodeError as e:
+                        print(f"JSON解析错误: {e}")
+                        print(f"原始数据: {comp['value']}")
+                        form_values[comp['name']] = ''  # 解析失败时设置默认值
+                    except Exception as e:
+                        print(f"处理表格字段时发生错误: {e}")
+                        print(f"组件数据: {comp}")
+                        form_values[comp['name']] = ''
                 else:
                     value = comp['value']
                     if value == 'null':  # 将字符串'null'替换为空字符串
@@ -503,7 +551,7 @@ if __name__ == '__main__':
     baoxiao_merged_excel = fr'{base_dir}\考勤报销数据\外包报销审批_merge_{current_datetime_str}.xlsx'
 
     #debug
-    # dateStr='2024-09-09-134429'
+    # dateStr='2025-01-09-134746'
     # kaoqin_excel_file = f'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包报销审批_{dateStr}.xlsx'
     # baoxiao_excel = fr'\\10.12.21.65\share\外包费用\新流程\考勤报销数据\外包出勤审批_{dateStr}.xlsx'
     # kaoqin_excel=fr'{base_dir}\考勤报销数据\外包出勤审批_{dateStr}.xlsx'
@@ -545,7 +593,7 @@ if __name__ == '__main__':
     if not matching_files:
         #1. 获取考勤,报销的审批记录，并保存为excel文件；
         print("#1. 获取#考勤,报销的审批记录，并保存为excel文件；")
-        #get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
+        get_kaoqin_ding_data(token, KQ_PROCESS_CODE, kq_data_start_time, kq_data_end_time, kq_data_start_time.month, kaoqin_excel)
         get_baoxiao_ding_data(token, BX_PROCESS_CODE, bx_data_start_time, bx_data_end_time, bx_data_start_time.month, baoxiao_excel)
         #sys.exit(0)
     else:
